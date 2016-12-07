@@ -63,6 +63,7 @@ MFILE *is_mtk_pkg(const char *pkgfile){
  	 */
 	if(find_AES_key(data + PHILIPS_HEADER_SIZE, UPG_HEADER_SIZE, compare_pkg_header, 0) != NULL){
 		is_philips_pkg = 1;
+		printf("philipspkg = 1\n");
 		return mf;
 	}
 
@@ -311,13 +312,16 @@ void extract_mtk_pkg(MFILE *mf, struct config_opts_t *config_opts){
 	int pakNo;
 	for(pakNo=0; moff(mf, data) < msize(mf); pakNo++){
 		struct mtkpkg *pak = (struct mtkpkg *)data;
+		printf("%x %x %x %x\n", data[0],data[1],data[2],data[3]);
 		/* End of package */
-		if(pak->size == 0){
+		/* if(pak->size == 0){
+			printf("paksize=0\n");
 			break;
-		}
+		}*/
 
 		if(is_philips_pkg && moff(mf, data) + PHILIPS_SIGNATURE_SIZE == msize(mf)){
 			//Philips RSA-2048 signature
+			printf("rsa-2048\n");
 			break;
 		}
 
@@ -373,7 +377,8 @@ void extract_mtk_pkg(MFILE *mf, struct config_opts_t *config_opts){
 
 		printf("Saving partition (%s) to file %s\n\n", pak->pakName, dest_path);
 
-		mfile_map(out, pkgSize);
+		if(pak->size != 0){
+		    mfile_map(out, pkgSize);
 
 		if((pak->flags & PAK_FLAG_ENCRYPTED) == PAK_FLAG_ENCRYPTED){
 			if(is_sharp_pkg){
@@ -389,7 +394,26 @@ void extract_mtk_pkg(MFILE *mf, struct config_opts_t *config_opts){
 				AES_cbc_encrypt(pkgData, mdata(out, void), pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
 			} else /* if(is_philips) */{
 				/* No AES key for Philips yet */
-				goto write_unencrypted;
+//				goto write_unencrypted;
+				uint i;
+				uint8_t ivec[16], keybuf[16];
+				memset(&ivec, 0x00, sizeof(ivec));
+//				for(i=0; i<4; i++){
+//					memcpy(&keybuf[4 * i], hdr->vendor_magic, sizeof(uint32_t));
+//				}
+
+				size_t count;
+				//https://www.download.p4c.philips.com/files/4/47pfl5007g_78/47pfl5007g_78_fus_brp.zip
+				const char hexstring[] = "47fbf8cad62bb95af3ad9509e5c2175d",*pos = hexstring; //2013
+
+				 for(count = 0; count < AES_BLOCK_SIZE; count++) {
+    				    sscanf(pos, "%2hhx", &keybuf[count]);
+				    pos += 2;
+				}
+
+				AES_KEY aesKey;
+				AES_set_decrypt_key((uint8_t *)&keybuf, 128, &aesKey);
+				AES_cbc_encrypt(pkgData, mdata(out, void), pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
 			}
 		} else {
 			write_unencrypted:
@@ -399,11 +423,13 @@ void extract_mtk_pkg(MFILE *mf, struct config_opts_t *config_opts){
 				pkgSize
 			);
 		}
+		}
 
 		mclose(out);
 		
 		/* No AES key for Philips yet */
-		if(!is_philips_pkg){
+		//if(!is_philips_pkg
+		if (pak->size != 0){
 			handle_file(dest_path, config_opts);
 		}
 
