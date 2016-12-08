@@ -416,7 +416,16 @@ void extract_mtk_pkg(MFILE *mf, struct config_opts_t *config_opts){
 
 				AES_KEY aesKey;
 				AES_set_decrypt_key((uint8_t *)&keybuf, 128, &aesKey);
-				AES_cbc_encrypt(pkgData-0x20, mdata(out, void), pkgSize+0x20, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
+
+				//unsigned char dec_out[pkgSize+0x20];
+				unsigned char *dec_out = malloc(pkgSize + 0x20);
+
+				if (pak->size >0x20)
+				    //AES_cbc_encrypt(pkgData-0x20, mdata(out, void), pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
+				AES_cbc_encrypt(pkgData-0x20, dec_out, pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
+				memcpy( mdata(out, void), dec_out +0x20 ,pkgSize-0x20);
+				free(dec_out);
+				printf("QUI\n");
 			}
 		} else {
 			write_unencrypted:
