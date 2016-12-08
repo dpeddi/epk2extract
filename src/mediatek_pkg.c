@@ -407,7 +407,10 @@ void extract_mtk_pkg(MFILE *mf, struct config_opts_t *config_opts){
 //				const char hexstring[] = "47fbf8cad62bb95af3ad9509e5c2175d",*pos = hexstring; //2012
 
 				//http://download.p4c.philips.com/files/4/42pfl4208k_12/42pfl4208k_12_fus_deu.zip
-				const char hexstring[] = "d378eaf81d378a801b556985789a7c31",*pos = hexstring; //2013
+//				const char hexstring[] = "d378eaf81d378a801b556985789a7c31",*pos = hexstring; //2013
+
+				//https://www.download.p4c.philips.com/files/4/40pfl3107h_12/40pfl3107h_12_fus_ita.zip
+				const char hexstring[] = "5450565F5450565F5450565F5450565F",*pos = hexstring; //2013
 
 				 for(count = 0; count < AES_BLOCK_SIZE; count++) {
     				    sscanf(pos, "%2hhx", &keybuf[count]);
@@ -420,10 +423,11 @@ void extract_mtk_pkg(MFILE *mf, struct config_opts_t *config_opts){
 				//unsigned char dec_out[pkgSize+0x20];
 				unsigned char *dec_out = malloc(pkgSize + 0x20);
 
-				if (pak->size >0x20)
+				if (pak->size >0x20) }
 				    //AES_cbc_encrypt(pkgData-0x20, mdata(out, void), pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
-				AES_cbc_encrypt(pkgData-0x20, dec_out, pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
-				memcpy( mdata(out, void), dec_out +0x20 ,pkgSize-0x20);
+					AES_cbc_encrypt(pkgData-0x20, dec_out, pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
+					memcpy( mdata(out, void), dec_out +0x20 ,pkgSize-0x20);
+				}
 				free(dec_out);
 				printf("QUI\n");
 			}
