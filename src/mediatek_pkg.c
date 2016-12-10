@@ -40,6 +40,11 @@ int compare_pkg_header(uint8_t *header, size_t headerSize){
 		return 1;
 	}
 
+	if( !strncmp(header, "reserved mtk inc", 0xc) ){
+		printf("[+] Found mediatek Package\n");
+		return 1;
+	}
+
 	if( !strncmp(hdr->mtk_magic, MTK_FIRMWARE_MAGIC, strlen(MTK_FIRMWARE_MAGIC)) ){
 		printf("[+] Found UNKNOWN Package (Magic: '%.*s')\n",
 			member_size(struct mtkupg_header, vendor_magic),
@@ -299,6 +304,10 @@ struct mtkupg_header *process_pkg_header(MFILE *mf){
 
 void extract_mtk_pkg(MFILE *mf, config_opts_t *config_opts){
 	off_t i = sizeof(struct mtkupg_header);
+
+	uint32_t datasize = 0;
+	uint8_t *decryptedData = NULL;
+
 	if(is_philips_pkg)
 		i += PHILIPS_HEADER_SIZE;
 
@@ -317,9 +326,22 @@ void extract_mtk_pkg(MFILE *mf, config_opts_t *config_opts){
 	int pakNo;
 	for(pakNo=0; moff(mf, data) < msize(mf); pakNo++){
 		struct mtkpkg *pak = (struct mtkpkg *)data;
+
 		/* End of package */
-		if(pak->size == 0){
+		// remove this code block
+		if(pak->size == 0){  
 			break;
+		}
+
+		if ((pak->flags & PAK_FLAG_ENCRYPTED) == PAK_FLAG_ENCRYPTED) {
+			datasize = pak->size + 0x30;
+		} else {
+			datasize = 0x30;
+		}
+
+		if (find_AES_key(data + 0xc, datasize, compare_pkg_header, KEY_CBC, (void **)&decryptedData, 0) != NULL){
+			printf("extract_mtk_pkg: aes key found, copy back %d bytes\n",datasize);
+			memcpy(data + 0xc, &decryptedData,datasize);
 		}
 
 		if(is_philips_pkg && moff(mf, data) + PHILIPS_SIGNATURE_SIZE == msize(mf)){
@@ -381,30 +403,30 @@ void extract_mtk_pkg(MFILE *mf, config_opts_t *config_opts){
 
 		mfile_map(out, pkgSize);
 
-		if((pak->flags & PAK_FLAG_ENCRYPTED) == PAK_FLAG_ENCRYPTED){
-			if(is_sharp_pkg){
-				uint i;
-				uint8_t ivec[16], keybuf[16];
-				memset(&ivec, 0x00, sizeof(ivec));
-				for(i=0; i<4; i++){
-					memcpy(&keybuf[4 * i], hdr->vendor_magic, sizeof(uint32_t));
-				}
+//		if((pak->flags & PAK_FLAG_ENCRYPTED) == PAK_FLAG_ENCRYPTED){
+//			if(is_sharp_pkg){
+//				uint i;
+//				uint8_t ivec[16], keybuf[16];
+//				memset(&ivec, 0x00, sizeof(ivec));
+//				for(i=0; i<4; i++){
+//					memcpy(&keybuf[4 * i], hdr->vendor_magic, sizeof(uint32_t));
+//				}
 
-				AES_KEY aesKey;
-				AES_set_decrypt_key((uint8_t *)&keybuf, 128, &aesKey);
-				AES_cbc_encrypt(pkgData, mdata(out, void), pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
-			} else /* if(is_philips) */{
-				/* No AES key for Philips yet */
-				goto write_unencrypted;
-			}
-		} else {
-			write_unencrypted:
+//				AES_KEY aesKey;
+//				AES_set_decrypt_key((uint8_t *)&keybuf, 128, &aesKey);
+//				AES_cbc_encrypt(pkgData, mdata(out, void), pkgSize, &aesKey, (uint8_t *)&ivec, AES_DECRYPT);
+//			} else /* if(is_philips) */{
+//				/* No AES key for Philips yet */
+//				goto write_unencrypted;
+//			}
+//		} else {
+//			write_unencrypted:
 			memcpy(
 				mdata(out, void),
 				pkgData,
 				pkgSize
-			);
-		}
+//			);
+//		}
 
 		mclose(out);
 		
